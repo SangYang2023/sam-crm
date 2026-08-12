@@ -1,0 +1,13 @@
+{
+  "name": "pet-crm-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "个人销售CRM同步后端（Render Node.js Web Service + Upstash Redis）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

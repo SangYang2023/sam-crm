@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pet-crm-sync
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: API_KEY
+        sync: false
