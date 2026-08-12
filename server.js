@@ -1,6 +1,5 @@
 // 个人销售CRM · 同步后端
 // 运行于 Render（Node.js Web Service，零依赖，纯 fetch 调用 Redis REST）
-// 前端地址：https://<service>.onrender.com   ->  路由 /customers
 const http = require('http');
 
 const KEY = 'pet_crm_customers';
@@ -75,7 +74,6 @@ const server = http.createServer(async (req, res) => {
   if(!path.startsWith('/customers')){ res.writeHead(404, CORS); res.end('not found'); return; }
   if(req.method === 'OPTIONS'){ res.writeHead(204, CORS); res.end(); return; }
 
-  // 鉴权：兼容 Authorization: Bearer 与 x-api-key 两种头
   const apiKey = process.env.API_KEY;
   if(apiKey){
     const auth = req.headers['authorization'] || '';
@@ -85,8 +83,9 @@ const server = http.createServer(async (req, res) => {
 
   try{
     if(req.method === 'GET'){
-      const arr = await rget();
-      send(res, 200, Array.isArray(arr) ? arr : []);
+      const raw = await rget();
+      const arr = Array.isArray(raw) ? raw : [];
+      send(res, 200, arr);
       return;
     }
 
@@ -125,7 +124,6 @@ const server = http.createServer(async (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log('Pet CRM sync server listening on ' + PORT);
-  // 启动自检
   (async()=>{
     try{
       const list = await rget();
