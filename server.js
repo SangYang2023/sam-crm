@@ -10,21 +10,33 @@ function envToken(){ return process.env.KV_REST_API_TOKEN || process.env.UPSTASH
 
 async function rget(){
   const url = envUrl(), token = envToken();
-  if(!url || !token) return null;
-  try{
-    const res = await fetch(`${url}/get/${KEY}`, { headers:{ 'Authorization':'Bearer '+token } });
-    const j = await res.json();
-    return j.result;
-  }catch(e){ console.error('Redis get failed', e); return null; }
+  if(!url || !token) throw new Error('Redis 环境变量未配置');
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+    body: JSON.stringify(['GET', KEY])
+  });
+  if(!res.ok){
+    const txt = await res.text().catch(()=>'');
+    throw new Error(`Redis get failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+  }
+  const j = await res.json();
+  if(j.result === null || j.result === undefined) return [];
+  try{ return JSON.parse(j.result); }catch(e){ return []; }
 }
 async function rset(val){
   const url = envUrl(), token = envToken();
   if(!url || !token) throw new Error('Redis 未配置');
-  await fetch(`${url}/set/${KEY}`, {
+  const res = await fetch(url, {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
-    body: JSON.stringify(val)
+    body: JSON.stringify(['SET', KEY, JSON.stringify(val)])
   });
+  if(!res.ok){
+    const txt = await res.text().catch(()=>'');
+    throw new Error(`Redis set failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+  }
+  return true;
 }
 
 const CORS = {
@@ -41,6 +53,15 @@ function send(res, status, body){
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   const path = u.pathname;
+  if(path === '/health' || path === '/health/'){
+    try{
+      const list = await rget();
+      send(res, 200, {ok:true, redis:true, records:Array.isArray(list)?list.length:0, time:new Date().toISOString()});
+    }catch(e){
+      send(res, 200, {ok:true, redis:false, error:String(e.message||e), time:new Date().toISOString()});
+    }
+    return;
+  }
   if(!path.startsWith('/customers')){ res.writeHead(404, CORS); res.end('not found'); return; }
   if(req.method === 'OPTIONS'){ res.writeHead(204, CORS); res.end(); return; }
 
@@ -54,9 +75,8 @@ const server = http.createServer(async (req, res) => {
 
   try{
     if(req.method === 'GET'){
-      const raw = await rget();
-      const arr = Array.isArray(raw) ? raw : [];
-      send(res, 200, arr);
+      const arr = await rget();
+      send(res, 200, Array.isArray(arr) ? arr : []);
       return;
     }
 
@@ -88,9 +108,18 @@ const server = http.createServer(async (req, res) => {
     send(res, 405, {error:'method not allowed'});
   }catch(e){
     console.error('handler error', e);
-    send(res, 500, {error: String(e && e.message || e)});
+    send(res, 500, {error: String(e && e.message || e), hint:'请检查 Render Environment 中的 UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN 是否正确'});
   }
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('Pet CRM sync server listening on ' + PORT));
+server.listen(PORT, () => {
+  console.log('Pet CRM sync server listening on ' + PORT);
+  // 启动自检
+  (async()=>{
+    try{
+      const list = await rget();
+      console.log('Redis self-test OK, records:', Array.isArray(list)?list.length:0);
+    }catch(e){ console.error('Redis self-test failed', e); }
+  })();
+});
