@@ -11,32 +11,42 @@ function envToken(){ return process.env.KV_REST_API_TOKEN || process.env.UPSTASH
 async function rget(){
   const url = envUrl(), token = envToken();
   if(!url || !token) throw new Error('Redis 环境变量未配置');
-  const res = await fetch(url, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
-    body: JSON.stringify(['GET', KEY])
-  });
-  if(!res.ok){
-    const txt = await res.text().catch(()=>'');
-    throw new Error(`Redis get failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify(['GET', KEY])
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(()=>'');
+      throw new Error(`Redis get failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+    }
+    const j = await res.json();
+    if(j.result === null || j.result === undefined) return [];
+    try{ return JSON.parse(j.result); }catch(e){ return []; }
+  }catch(e){
+    const cause = e && e.cause && (e.cause.message || e.cause.code) ? ` (${e.cause.message || e.cause.code})` : '';
+    throw new Error(`fetch failed: ${e.message||e}${cause}`);
   }
-  const j = await res.json();
-  if(j.result === null || j.result === undefined) return [];
-  try{ return JSON.parse(j.result); }catch(e){ return []; }
 }
 async function rset(val){
   const url = envUrl(), token = envToken();
   if(!url || !token) throw new Error('Redis 未配置');
-  const res = await fetch(url, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
-    body: JSON.stringify(['SET', KEY, JSON.stringify(val)])
-  });
-  if(!res.ok){
-    const txt = await res.text().catch(()=>'');
-    throw new Error(`Redis set failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+n      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify(['SET', KEY, JSON.stringify(val)])
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(()=>'');
+      throw new Error(`Redis set failed: HTTP ${res.status} ${txt.slice(0,200)}`);
+    }
+    return true;
+  }catch(e){
+    const cause = e && e.cause && (e.cause.message || e.cause.code) ? ` (${e.cause.message || e.cause.code})` : '';
+    throw new Error(`fetch failed: ${e.message||e}${cause}`);
   }
-  return true;
 }
 
 const CORS = {
