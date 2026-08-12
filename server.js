@@ -35,7 +35,7 @@ async function rset(val){
   try{
     const res = await fetch(url, {
       method:'POST',
-n      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
       body: JSON.stringify(['SET', KEY, JSON.stringify(val)])
     });
     if(!res.ok){
